@@ -2,6 +2,10 @@
 name = "weather-union"
 version = "0.1.0"
 edition = "2021"
+readme = "readme.md"
+repository = "https://github.com/croyla/weather-union-rs"
+description = "A package for https://www.weatherunion.com/"
+license-file = "license"
 
 [dependencies]
 reqwest = "0.12.4"
