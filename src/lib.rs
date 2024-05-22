@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use reqwest::{Response, StatusCode};
-use crate::WeatherResponseError::UnknownError;
 
 pub struct WeatherUnion {
     api_key: String,
@@ -26,7 +25,7 @@ pub struct LocalityWeatherData {
 
 #[derive(Debug)]
 pub enum WeatherResponseError {
-    ErrorRetrievingData, NotSupported, ApiKeyLimitExhausted, CouldNotAuthenticate, TemporarilyUnavailable, UnknownError(StatusCode)
+    ErrorRetrievingData, NotSupported, ApiKeyLimitExhausted, CouldNotAuthenticate, TemporarilyUnavailable(String), UnknownError(StatusCode), InvalidResponse
 }
 
 impl WeatherUnion {
@@ -40,9 +39,11 @@ impl WeatherUnion {
             // 200, successful response
             StatusCode::OK => {
                 let body = payload.text().await.unwrap();
-                let parsed = serde_json::from_str::<BodyValues>(body.as_str()).unwrap();
-                if !parsed.message.is_empty() {
-                    Err(WeatherResponseError::TemporarilyUnavailable)
+                let parsed = if serde_json::from_str::<BodyValues>(body.as_str()).is_ok()
+                { serde_json::from_str::<BodyValues>(body.as_str()).unwrap() }
+                else{ return Err(WeatherResponseError::InvalidResponse) };
+                return if !parsed.message.is_empty() {
+                    Err(WeatherResponseError::TemporarilyUnavailable(parsed.message))
                 } else {
                     Ok(LocalityWeatherData {
                         device: parsed.device_type,
@@ -71,21 +72,21 @@ impl WeatherUnion {
             }
             // 500, error retrieving data
             StatusCode::INTERNAL_SERVER_ERROR => {
-                Err(WeatherResponseError::ErrorRetrievingData)}
+                return Err(WeatherResponseError::ErrorRetrievingData)}
             // 400, latitude longitude / locality id not supported
             StatusCode::BAD_REQUEST => {
-                Err(WeatherResponseError::NotSupported)
+                return Err(WeatherResponseError::NotSupported)
             }
             // 429, api key limit exhausted
             StatusCode::TOO_MANY_REQUESTS => {
-                Err(WeatherResponseError::ApiKeyLimitExhausted)
+                return Err(WeatherResponseError::ApiKeyLimitExhausted)
             }
             // 403, could not authenticate
             StatusCode::FORBIDDEN => {
-                Err(WeatherResponseError::CouldNotAuthenticate)
+                return Err(WeatherResponseError::CouldNotAuthenticate)
             }
             other => {
-                Err(UnknownError(other))
+                return Err(WeatherResponseError::UnknownError(other))
             }
         }
     }
@@ -124,7 +125,7 @@ mod tests {
         let api_key = fs::read_to_string("target/api_key")
             .expect("Should have been able to read the file");
         let variable = WeatherUnion::from_key(api_key);
-        let out = aw!(variable.lat_long(12.936787, 77.556079));
+        let out = aw!(variable.lat_long(12.936787, 77.556079)); // Banashankari, BLR
         drop(variable);
         println!("lat_long {:?}", out);
         assert!(out.is_ok());
@@ -135,9 +136,21 @@ mod tests {
         let api_key = fs::read_to_string("target/api_key")
             .expect("Should have been able to read the file");
         let variable = WeatherUnion::from_key(api_key);
-        let out = aw!(variable.locality_id("ZWL003467".to_string()));
+        let out = aw!(variable.locality_id("ZWL003467".to_string())); // Banashankari, BLR
         drop(variable);
         println!("locality_id {:?}", out);
         assert!(out.is_ok());
+    }
+
+    #[test]
+    fn test_locality_rgs() {
+        let api_key = fs::read_to_string("target/api_key")
+            .expect("Should have been able to read the file");
+        let variable = WeatherUnion::from_key(api_key);
+        let out = aw!(variable.locality_id("ZWL008436".to_string())); // Moudhapara, Raipur
+        drop(variable);
+        println!("locality_id_rgs {:?}", out);
+        assert!(out.is_ok());
+
     }
 }
