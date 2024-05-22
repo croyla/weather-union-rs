@@ -1,11 +1,11 @@
 [package]
 name = "weather-union"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 readme = "readme.md"
 repository = "https://github.com/croyla/weather-union-rs"
 description = "A package for https://www.weatherunion.com/"
-license-file = "license"
+license = "MIT"
 
 [dependencies]
 reqwest = "0.12.4"

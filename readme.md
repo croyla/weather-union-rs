@@ -1,7 +1,10 @@
-## weather-union rust implementation
+# weather-union rust implementation
+A rust implementation lib for weatherunion api.
+## Quickstart
 ```rust
 let instance = WeatherUnion::from_key("api_key".to_string());
-let weather_info = instance.locality_id("locality_id".to_string()).await.unwrap();
+let weather_info = instance.locality(LocalityId::ZWL#).await.unwrap();
+println!("Live temperature for {}", LocalityId::ZWL#.locality_name());
 println!("{}", weather_info.temperature);
 ```
-Where "api_key" is your WeatherUnion api key and "locality_id" is a locality id from [here](https://b.zmtcdn.com/data/file_assets/65fa362da3aa560a92f0b8aeec0dfda31713163042.pdf)
+Where "api_key" is your WeatherUnion api key and ZWL# is a locality id from [here](https://github.com/croyla/weather-union-rs/blob/master/localities.txt)
