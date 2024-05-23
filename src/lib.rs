@@ -5,6 +5,14 @@ use std::collections::HashMap;
 use std::fmt::Formatter;
 use reqwest::{Response, StatusCode};
 
+/// WeatherUnion Client
+/// # Example usage
+/// ```
+/// use weather_union::WeatherUnion;
+/// let api_key: String = "api_key".to_string(); // Ideally you want to capture this from an environment variable or a file
+/// let client = WeatherUnion::from_key(api_key);
+/// //Use as needed...
+/// ```
 pub struct WeatherUnion {
     api_key: String,
 }
@@ -16,15 +24,31 @@ struct BodyValues {
     device_type: u8
 }
 
+/// Locality weather data format
+/// # Example usage
+/// ```
+///
+/// use weather_union::{LocalityId, WeatherUnion};
+/// async fn example(){
+///     let client = WeatherUnion::from_key("api_key".to_string());
+///     let data = client.locality(LocalityId::ZWL001036).await.unwrap(); //Retrieve the data
+///     if data.is_device(){ // confirm returned data is from a device
+///         let is_aws = data.device == 1; // Is the device an automatic weather system?
+///         let is_rgs = data.device == 2; // Is the device a rain gauge system?
+///         let temperature = data.temperature; // query different values like so.
+///         print!("{}", data.wind_speed);
+///     }
+/// }
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct LocalityWeatherData {
-    device: u8,
-    temperature: f64,
-    humidity: f64,
-    wind_speed: f64,
-    wind_direction: f64,
-    rain_intensity: f64,
-    rain_accumulation: f64,
+    pub device: u8,
+    pub temperature: f64,
+    pub humidity: f64,
+    pub wind_speed: f64,
+    pub wind_direction: f64,
+    pub rain_intensity: f64,
+    pub rain_accumulation: f64,
 }
 
 #[derive(Debug)]
@@ -32,9 +56,19 @@ pub enum WeatherResponseError {
     ErrorRetrievingData, NotSupported, ApiKeyLimitExhausted, CouldNotAuthenticate, TemporarilyUnavailable(String), UnknownError(StatusCode), InvalidResponse
 }
 
+impl LocalityWeatherData {
+
+    /// Returns true if the instance is from a device.
+    pub fn is_device(&self) -> bool {
+        return self.device == 1 || self.device == 2
+    }
+}
+
 impl WeatherUnion {
 
-    fn from_key(key: String) -> WeatherUnion {
+    /// Instantiate from an api_key\
+    /// Get your api key from [here](https://www.weatherunion.com/)
+    pub fn from_key(key: String) -> WeatherUnion {
         return WeatherUnion {api_key: key}
     }
 
@@ -94,6 +128,15 @@ impl WeatherUnion {
         }
     }
 
+    /// Query the API with lat and long values
+    /// # Example
+    /// ```
+    ///  use weather_union::WeatherUnion;
+    /// async fn example(){
+    ///     let client = WeatherUnion::from_key("api_key".to_string());
+    ///     let data = client.lat_long(28.531759, 77.293973); //Retrieve the data
+    /// }
+    /// ```
     pub async fn lat_long(&self, lat: f64, long: f64) -> Result<LocalityWeatherData, WeatherResponseError> {
         let client = reqwest::Client::new(); // create new client every request as we dont need to save data
         let response = client.get(format!(
@@ -104,7 +147,16 @@ impl WeatherUnion {
         return self.process_payload(response).await;
     }
 
-    pub async fn locality_id(&self, id: String) -> Result<LocalityWeatherData, WeatherResponseError> {
+    /// Query the API with locality_id strings
+    /// # Example
+    /// ```
+    ///  use weather_union::WeatherUnion;
+    /// async fn example(){
+    ///     let client = WeatherUnion::from_key("api_key".to_string());
+    ///     let data = client.locality_id("ZWL005764"); //Retrieve the data
+    /// }
+    /// ```
+    pub async fn locality_id(&self, id: &str) -> Result<LocalityWeatherData, WeatherResponseError> {
         let client = reqwest::Client::new(); // create new client every request as we dont need to save data
         let response = client.get(format!(
             "https://www.weatherunion.com/gw/weather/external/v0/get_locality_weather_data?locality_id={id}"
@@ -113,6 +165,15 @@ impl WeatherUnion {
         return self.process_payload(response).await;
     }
 
+    /// Query the API with LocalityId constants
+    /// # Example
+    /// ```
+    ///  use weather_union::{LocalityId, WeatherUnion};
+    /// async fn example(){
+    ///     let client = WeatherUnion::from_key("api_key".to_string());
+    ///     let data = client.locality(LocalityId::ZWL005764); //Retrieve the data
+    /// }
+    /// ```
     pub async fn locality(&self, id: LocalityId) -> Result<LocalityWeatherData, WeatherResponseError> {
         let client = reqwest::Client::new(); // create new client every request as we dont need to save data
         let response = client.get(format!(
@@ -144,9 +205,22 @@ impl LocalityId {
 
     }
 
+    /// Get the name of the locality
+    /// # Example
+    /// ```
+    ///  use weather_union::LocalityId;
+    ///  assert_eq!(LocalityId::ZWL005764.locality_name().unwrap(), "Delhi NCR Sarita Vihar");
+    /// ```
     pub fn locality_name(&self) -> Option<&str> {
         return area_name(self.0)
     }
+
+    /// Get the lat and long of the locality
+    /// # Example
+    /// ```
+    ///  use weather_union::LocalityId;
+    ///  assert_eq!(LocalityId::ZWL005764.locality_lat_long().unwrap(), (28.531759, 77.293973));
+    /// ```
     pub fn locality_lat_long(&self) -> Option<(f64, f64)> {
         return area_lat_long(self.0)
     }
@@ -816,7 +890,7 @@ mod tests {
         let api_key = fs::read_to_string("target/api_key")
             .expect("Should have been able to read the file");
         let variable = WeatherUnion::from_key(api_key);
-        let out = aw!(variable.locality_id("ZWL003467".to_string())); // Banashankari, BLR
+        let out = aw!(variable.locality_id("ZWL003467")); // Banashankari, BLR
         drop(variable);
         println!("locality_id {:?}", out);
         assert!(out.is_ok());
@@ -827,7 +901,7 @@ mod tests {
         let api_key = fs::read_to_string("target/api_key")
             .expect("Should have been able to read the file");
         let variable = WeatherUnion::from_key(api_key);
-        let out = aw!(variable.locality_id("ZWL008436".to_string())); // Moudhapara, Raipur
+        let out = aw!(variable.locality_id("ZWL008436")); // Moudhapara, Raipur
         drop(variable);
         println!("locality_id_rgs {:?}", out);
         assert!(out.is_ok());
